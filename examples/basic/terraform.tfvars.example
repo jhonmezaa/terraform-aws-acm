@@ -1,0 +1,31 @@
+# =============================================================================
+# Basic ACM Certificate Example - Variables
+# =============================================================================
+# This file contains example values for the basic ACM certificate example.
+# Copy this file to terraform.tfvars and modify the values as needed.
+
+# AWS Region
+# aws_region = "us-east-1"
+
+# Account and Project Names
+# account_name = "dev"
+# project_name = "webapp"
+
+# Primary domain name (REQUIRED - must have a Route53 hosted zone)
+domain_name = "example.com"
+
+# =============================================================================
+# Usage Instructions
+# =============================================================================
+# 1. Copy this file: cp terraform.tfvars.example terraform.tfvars
+# 2. Update domain_name to your actual domain with a Route53 hosted zone
+# 3. Run: terraform init
+# 4. Run: terraform plan
+# 5. Run: terraform apply
+
+# =============================================================================
+# Notes
+# =============================================================================
+# - The domain must have a Route53 hosted zone for DNS validation to work
+# - A wildcard SAN (*.example.com) is included by default
+# - Certificate validation typically takes 2-5 minutes with DNS
