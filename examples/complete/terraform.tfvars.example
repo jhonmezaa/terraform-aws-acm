@@ -1,0 +1,36 @@
+# =============================================================================
+# Complete ACM Certificate Example - Variables
+# =============================================================================
+# This file contains example values for the complete ACM certificate example.
+# Copy this file to terraform.tfvars and modify the values as needed.
+
+# AWS Region
+# aws_region = "us-east-1"
+
+# Account and Project Names
+# account_name = "prod"
+# project_name = "platform"
+
+# Primary domain (REQUIRED - must have a Route53 hosted zone)
+primary_domain = "example.com"
+
+# Secondary domain (optional - for multi-domain certificates)
+# secondary_domain = "example.org"
+
+# =============================================================================
+# Usage Instructions
+# =============================================================================
+# 1. Copy this file: cp terraform.tfvars.example terraform.tfvars
+# 2. Update primary_domain to your actual domain with a Route53 hosted zone
+# 3. Optionally set secondary_domain for multi-domain certificates
+# 4. Run: terraform init
+# 5. Run: terraform plan
+# 6. Run: terraform apply
+
+# =============================================================================
+# Certificates Created
+# =============================================================================
+# This example creates the following certificates:
+# 1. wildcard   - DNS validated, RSA_2048, *.example.com + *.api.example.com
+# 2. ec-cert    - DNS validated, EC_prime256v1, secure.example.com
+# 3. email-validated - Email validated, no Route53 records
