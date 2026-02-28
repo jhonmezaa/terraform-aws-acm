@@ -59,36 +59,38 @@ locals {
   # Filter certificates that should be created (not imported)
   create_certificates = var.create ? {
     for k, v in var.certificates : k => v
-    if v.certificate_body == null && v.private_key == null
+    if !v.is_import
   } : {}
 
   # Filter certificates that should be imported
   import_certificates = var.create ? {
     for k, v in var.certificates : k => v
-    if v.certificate_body != null && v.private_key != null
+    if v.is_import
   } : {}
 
   # =============================================================================
   # DNS Validation Processing
   # =============================================================================
 
-  # Build a flat map of all DNS validation records needed across all certificates.
-  # Each certificate can have multiple domain_validation_options (main domain + SANs).
+  # Pre-compute expected domain names for each certificate from input variables.
+  # This ensures for_each keys are known at plan time (not derived from resource output).
   # We deduplicate by replacing wildcard prefixes (*.) since the validation record
   # for *.example.com is the same as example.com.
-  dns_validation_records = merge([
+  dns_validation_domains = merge([
     for cert_key, cert in local.create_certificates : {
-      for dvo in try(aws_acm_certificate.this[cert_key].domain_validation_options, []) :
-      "${cert_key}/${replace(dvo.domain_name, "*.", "")}" => {
-        cert_key              = cert_key
-        domain_name           = dvo.domain_name
-        resource_record_name  = dvo.resource_record_name
-        resource_record_type  = dvo.resource_record_type
-        resource_record_value = dvo.resource_record_value
-        zone_id               = cert.zone_id
+      for domain in distinct([
+        for d in concat([cert.domain_name], cert.subject_alternative_names) :
+        replace(d, "*.", "")
+      ]) :
+      "${cert_key}/${domain}" => {
+        cert_key = cert_key
+        zone_id  = cert.zone_id
       }
-    } if cert.validation_method == "DNS" && cert.zone_id != null && cert.create_route53_records
+    } if cert.validation_method == "DNS" && cert.create_route53_records
   ]...)
+
+  # dns_validation_domains is used directly in for_each (keys are statically known).
+  # The actual DVO values are looked up inline in the resource using the cert_key and domain.
 
   # Certificates that need validation waiting
   certificates_to_validate = {

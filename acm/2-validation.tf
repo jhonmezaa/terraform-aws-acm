@@ -3,14 +3,26 @@
 # =============================================================================
 
 resource "aws_route53_record" "validation" {
-  for_each = local.dns_validation_records
+  for_each = local.dns_validation_domains
 
   zone_id = each.value.zone_id
-  name    = each.value.resource_record_name
-  type    = each.value.resource_record_type
-  ttl     = var.certificates[each.value.cert_key].dns_ttl
+  name = [
+    for dvo in aws_acm_certificate.this[each.value.cert_key].domain_validation_options :
+    dvo.resource_record_name
+    if replace(dvo.domain_name, "*.", "") == split("/", each.key)[1]
+  ][0]
+  type = [
+    for dvo in aws_acm_certificate.this[each.value.cert_key].domain_validation_options :
+    dvo.resource_record_type
+    if replace(dvo.domain_name, "*.", "") == split("/", each.key)[1]
+  ][0]
+  ttl = var.certificates[each.value.cert_key].dns_ttl
 
-  records = [each.value.resource_record_value]
+  records = [[
+    for dvo in aws_acm_certificate.this[each.value.cert_key].domain_validation_options :
+    dvo.resource_record_value
+    if replace(dvo.domain_name, "*.", "") == split("/", each.key)[1]
+  ][0]]
 
   allow_overwrite = var.certificates[each.value.cert_key].validation_allow_overwrite
 
@@ -28,7 +40,7 @@ resource "aws_acm_certificate_validation" "this" {
 
   validation_record_fqdns = each.value.validation_method == "DNS" && each.value.zone_id != null && each.value.create_route53_records ? [
     for k, v in aws_route53_record.validation : v.fqdn
-    if v.zone_id == each.value.zone_id || startswith(k, "${each.key}/")
+    if startswith(k, "${each.key}/")
   ] : null
 
   timeouts {
