@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Core ACM Features
+
 - ACM certificate creation with DNS or Email validation
 - Certificate import support (existing certificates with private key, body, and chain)
 - Multiple certificates via `for_each` pattern using `certificates` map variable
@@ -18,23 +19,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Certificate transparency logging control
 
 #### Key Algorithm Support
+
 - RSA_2048 (default)
 - EC_prime256v1 (ECDSA P-256)
 - EC_secp384r1 (ECDSA P-384)
 - EC_secp521r1 (ECDSA P-521)
 
 #### Wildcard and SAN Support
-- Wildcard certificate support (e.g., *.example.com)
+
+- Wildcard certificate support (e.g., \*.example.com)
 - Subject Alternative Names (SANs) for multi-domain certificates
 - Automatic deduplication of wildcard DNS validation records
 
 #### Naming Convention
+
 - Automatic region prefix mapping for 29 AWS regions
 - Consistent naming: `{region_prefix}-acm-{account_name}-{project_name}-{key}`
 - Optional region prefix via `use_region_prefix` variable
 - Custom region prefix override support
 
 #### Variable Validations
+
 - `account_name`: 1-32 characters, lowercase letters, numbers, and hyphens
 - `project_name`: 1-32 characters, lowercase letters, numbers, and hyphens
 - `validation_method`: Must be DNS or EMAIL
@@ -42,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `certificate_body` and `private_key`: Must be provided together for imports
 
 #### Outputs (6 total)
+
 - Certificate ARNs (validated or imported)
 - Certificate statuses
 - Certificate domain names
@@ -50,10 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Route53 validation record FQDNs
 
 #### Examples
+
 - **basic**: Single certificate with DNS validation and wildcard SAN
 - **complete**: Multiple certificates with different algorithms, validation methods, and configurations
 
 #### Documentation
+
 - Comprehensive README with usage examples
 - Complete variable documentation with descriptions
 - Output variable documentation
