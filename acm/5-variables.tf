@@ -77,6 +77,8 @@ variable "certificates" {
     - validation_timeout:        (Optional) Timeout for validation completion. Default: "45m".
     - validation_allow_overwrite: (Optional) Whether to allow overwriting existing Route53 validation records. Default: true.
     - dns_ttl:                   (Optional) TTL for DNS validation records. Default: 60.
+    - is_import:                 (Optional) Set to true to import an existing certificate instead of creating a new one. Default: false.
+                                 When true, certificate_body and private_key must be provided.
     - certificate_body:          (Optional) Certificate body for importing an existing certificate (PEM format).
     - private_key:               (Optional) Private key for importing an existing certificate (PEM format).
     - certificate_chain:         (Optional) Certificate chain for importing an existing certificate (PEM format).
@@ -95,6 +97,7 @@ variable "certificates" {
     validation_timeout         = optional(string, "45m")
     validation_allow_overwrite = optional(bool, true)
     dns_ttl                    = optional(number, 60)
+    is_import                  = optional(bool, false)
     certificate_body           = optional(string)
     private_key                = optional(string)
     certificate_chain          = optional(string)
@@ -106,7 +109,7 @@ variable "certificates" {
     condition = alltrue([
       for k, v in var.certificates :
       v.validation_method == null || contains(["DNS", "EMAIL"], v.validation_method)
-      if v.certificate_body == null && v.private_key == null
+      if !v.is_import
     ])
     error_message = "validation_method must be 'DNS' or 'EMAIL' for new certificates."
   }
@@ -115,16 +118,8 @@ variable "certificates" {
     condition = alltrue([
       for k, v in var.certificates :
       contains(["RSA_2048", "EC_prime256v1", "EC_secp384r1", "EC_secp521r1"], v.key_algorithm)
-      if v.certificate_body == null && v.private_key == null
+      if !v.is_import
     ])
     error_message = "key_algorithm must be one of: RSA_2048, EC_prime256v1, EC_secp384r1, EC_secp521r1."
-  }
-
-  validation {
-    condition = alltrue([
-      for k, v in var.certificates :
-      (v.certificate_body != null) == (v.private_key != null)
-    ])
-    error_message = "Both certificate_body and private_key must be provided together for certificate import."
   }
 }
