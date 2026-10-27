@@ -26,6 +26,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update README documentation and CHANGELOG formatting
 
+## [v1.1.1] - 2026-02-28
+
+### Changed
+
+- Update README documentation and CHANGELOG formatting
+
+## [v1.1.0] - 2026-02-28
+
+### Added
+
+- `is_import` boolean field (default: `false`) in `certificates` to explicitly control the import vs create flow, avoiding unknown `for_each` keys when `certificate_body`/`private_key` are computed values
+
+### Fixed
+
+- Resolve `for_each` unknown key issues in DNS validation and certificate import
+- Pre-compute DNS validation record keys from input variables (`domain_name` and `subject_alternative_names`) instead of deriving them from resource output, so `for_each` keys are known at plan time
+- Remove `zone_id != null` check from the `dns_validation_domains` filter to prevent unknown value propagation when `zone_id` comes from another module's output
+- Look up `domain_validation_options` values inline in the Route53 record resource instead of in a local, keeping `for_each` keys static
+
 ## [v1.0.0] - 2026-02-27
 
 ### Added
