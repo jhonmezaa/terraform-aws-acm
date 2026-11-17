@@ -56,6 +56,12 @@ variable "tags_common" {
   default     = {}
 }
 
+variable "external_validation_record_fqdns" {
+  description = "Map of certificate key => FQDNs of externally managed DNS validation records, passed to the validation waiter together with each certificate's validation_record_fqdns. Separate from var.certificates so it can reference records created from this module's outputs (e.g. by a second instance of this module in records-only mode) without a dependency cycle."
+  type        = map(list(string))
+  default     = {}
+}
+
 variable "tags" {
   description = "(Deprecated: use tags_common) Additional tags to apply to all certificates. Merged after tags_common."
   type        = map(string)
@@ -88,6 +94,11 @@ variable "certificates" {
                                  in a different hosted zone than zone_id.
     - create_route53_records:    (Optional) Whether to create Route53 DNS validation records. Default: true.
     - validation_record_fqdns:   (Optional) FQDNs of externally managed DNS validation records passed to the validation waiter.
+    - create_route53_records_only: (Optional) Do not create the certificate: only create the Route53 DNS validation records of an
+                                 existing certificate from domain_validation_options (e.g. with a provider for another account).
+                                 Requires validation_method = "DNS". Default: false.
+    - domain_validation_options: (Optional) Domain validation options of the existing certificate (records-only mode), e.g. the
+                                 certificate_domain_validation_options or validation_domains output of another instance of this module.
     - key_algorithm:             (Optional) Algorithm for the certificate key pair. Default: "RSA_2048".
                                  Valid values: RSA_2048, EC_prime256v1, EC_secp384r1, EC_secp521r1.
     - transparency_logging:      (Optional) Whether to log certificate details to a transparency log. Default: true.
@@ -104,18 +115,25 @@ variable "certificates" {
   EOT
 
   type = map(object({
-    domain_name                = string
-    name                       = optional(string)
-    region                     = optional(string)
-    subject_alternative_names  = optional(list(string), [])
-    validation_method          = optional(string, "DNS")
-    certificate_authority_arn  = optional(string)
-    export                     = optional(string)
-    validation_options         = optional(map(string), {})
-    zone_id                    = optional(string)
-    zones                      = optional(map(string), {})
-    create_route53_records     = optional(bool, true)
-    validation_record_fqdns    = optional(list(string), [])
+    domain_name                 = string
+    name                        = optional(string)
+    region                      = optional(string)
+    subject_alternative_names   = optional(list(string), [])
+    validation_method           = optional(string, "DNS")
+    certificate_authority_arn   = optional(string)
+    export                      = optional(string)
+    validation_options          = optional(map(string), {})
+    zone_id                     = optional(string)
+    zones                       = optional(map(string), {})
+    create_route53_records      = optional(bool, true)
+    validation_record_fqdns     = optional(list(string), [])
+    create_route53_records_only = optional(bool, false)
+    domain_validation_options = optional(list(object({
+      domain_name           = string
+      resource_record_name  = string
+      resource_record_type  = string
+      resource_record_value = string
+    })), [])
     key_algorithm              = optional(string, "RSA_2048")
     transparency_logging       = optional(bool, true)
     wait_for_validation        = optional(bool, true)
@@ -179,8 +197,26 @@ variable "certificates" {
       for k, v in var.certificates : [
         for d in concat([v.domain_name], v.subject_alternative_names) :
         lookup(v.zones, replace(d, "*.", ""), v.zone_id) != null
-      ] if !v.is_import && v.validation_method == "DNS" && v.create_route53_records
+      ] if !v.is_import && v.validation_method == "DNS" && (v.create_route53_records || v.create_route53_records_only)
     ]))
     error_message = "Con validation_method = 'DNS' y create_route53_records = true, cada dominio necesita zone_id o una entrada en zones."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.certificates :
+      !v.is_import && v.validation_method == "DNS"
+      if v.create_route53_records_only
+    ])
+    error_message = "create_route53_records_only requiere validation_method = 'DNS' y no se puede combinar con is_import."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.certificates :
+      length(v.domain_validation_options) > 0
+      if v.create_route53_records_only
+    ])
+    error_message = "create_route53_records_only requiere domain_validation_options (las opciones de validación del certificado existente)."
   }
 }
