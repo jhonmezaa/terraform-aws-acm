@@ -21,3 +21,13 @@ output "validation_record_fqdns" {
   description = "Map of DNS validation record FQDNs."
   value       = module.acm.validation_route53_record_fqdns
 }
+
+output "certificate_names" {
+  description = "Map of certificate Name tags."
+  value       = module.acm.certificate_names
+}
+
+output "distinct_domain_names" {
+  description = "Map of distinct domain names per certificate."
+  value       = module.acm.distinct_domain_names
+}
