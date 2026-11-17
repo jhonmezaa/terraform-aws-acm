@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and adjust.
+
+# aws_region = "us-east-1"
+
+# Role in the account that owns the Route53 hosted zone (omit to use the same account)
+# dns_role_arn = "arn:aws:iam::111111111111:role/route53-acm-validation"
+
+# account_name = "dev"
+# project_name = "webapp"
+
+domain_name = "example.com"
