@@ -54,3 +54,24 @@ output "validation_route53_record_fqdns" {
     for k, v in aws_route53_record.validation : k => v.fqdn
   }
 }
+
+output "distinct_domain_names" {
+  description = "Map of distinct domain names (wildcard prefix removed) per created certificate, as used for DNS validation."
+  value       = local.distinct_domain_names
+}
+
+output "certificate_names" {
+  description = "Map of the Name tag assigned to each certificate."
+  value = {
+    for k, v in merge(aws_acm_certificate.this, aws_acm_certificate.imported) : k => v.tags["Name"]
+  }
+}
+
+output "validation_domains" {
+  description = "Map of distinct domain validation options per created certificate, with the wildcard prefix removed from domain_name. Useful to create DNS validation records outside this module when SANs contain wildcards."
+  value = {
+    for k, v in aws_acm_certificate.this : k => distinct([
+      for dvo in v.domain_validation_options : merge(tomap(dvo), { domain_name = replace(dvo.domain_name, "*.", "") })
+    ])
+  }
+}
