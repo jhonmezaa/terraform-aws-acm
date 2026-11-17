@@ -28,12 +28,18 @@ locals {
     "ap-northeast-3" = "apne3"
     "ap-south-1"     = "apso1"
     "ap-south-2"     = "apso2"
+    "ap-southeast-5" = "apse5"
+    "ap-southeast-6" = "apse6"
+    "ap-southeast-7" = "apse7"
     "ap-east-1"      = "apea1"
+    "ap-east-2"      = "apea2"
     # SA Regions
     "sa-east-1" = "saea1"
     # CA Regions
     "ca-central-1" = "cace1"
     "ca-west-1"    = "cawe1"
+    # MX Regions
+    "mx-central-1" = "mxce1"
     # ME Regions
     "me-south-1"   = "meso1"
     "me-central-1" = "mece1"
@@ -51,6 +57,26 @@ locals {
 
   # Name prefix: includes region prefix with trailing dash, or empty string
   name_prefix = var.use_region_prefix ? "${local.region_prefix}-" : ""
+
+  # Common tags (tags is kept as a deprecated alias of tags_common)
+  tags_common = merge(var.tags_common, var.tags)
+
+  # Name prefix per certificate: certificates with their own `region` use that
+  # region's prefix; the rest use local.name_prefix.
+  certificate_name_prefixes = {
+    for k, v in var.certificates : k => (
+      v.region == null || !var.use_region_prefix ? local.name_prefix :
+      "${var.region_prefix != null ? var.region_prefix : lookup(local.region_prefix_map, v.region, v.region)}-"
+    )
+  }
+
+  # Name tag per certificate (an explicit `name` always wins).
+  certificate_names = {
+    for k, v in var.certificates : k => coalesce(
+      v.name,
+      "${local.certificate_name_prefixes[k]}acm-${var.account_name}-${var.project_name}-${k}"
+    )
+  }
 
   # =============================================================================
   # Certificate Processing
@@ -84,10 +110,18 @@ locals {
       ]) :
       "${cert_key}/${domain}" => {
         cert_key = cert_key
-        zone_id  = cert.zone_id
+        zone_id  = lookup(cert.zones, domain, cert.zone_id)
       }
     } if cert.validation_method == "DNS" && cert.create_route53_records
   ]...)
+
+  # Distinct domain names (wildcards removed) per created certificate.
+  distinct_domain_names = {
+    for cert_key, cert in local.create_certificates : cert_key => distinct([
+      for d in concat([cert.domain_name], cert.subject_alternative_names) :
+      replace(d, "*.", "")
+    ])
+  }
 
   # dns_validation_domains is used directly in for_each (keys are statically known).
   # The actual DVO values are looked up inline in the resource using the cert_key and domain.
@@ -95,6 +129,6 @@ locals {
   # Certificates that need validation waiting
   certificates_to_validate = {
     for k, v in local.create_certificates : k => v
-    if v.wait_for_validation && v.validation_method != null
+    if v.wait_for_validation && v.validation_method != "NONE"
   }
 }
