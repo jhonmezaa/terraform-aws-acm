@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.3.0] - 2026-11-17
+
+### Added
+
+- Route53 records-only mode (official module's `create_certificate = false` + `create_route53_records_only = true`): per-certificate `create_route53_records_only` and `domain_validation_options` attributes create only the DNS validation records of an existing certificate, e.g. in the hosted zone of another account through a separate provider. The certificate and its validation waiter are not created for that key
+- `external_validation_record_fqdns` variable (map of certificate key => FQDNs) passed to the validation waiter, so record FQDNs from another module instance can be referenced without a dependency cycle
+- Example `examples/route53-records-only` (certificate and DNS records with separate AWS providers)
+
+### Changed
+
+- Outputs `distinct_domain_names` and `validation_domains` also include records-only certificates
+- README `source` references use `ref=v1.3.0`
+
+### Upgrade notes
+
+- Backward compatible: the new attributes default to `false` / `[]` / `{}`, and for existing configurations no for_each key, resource argument or generated name changes (no resource is recreated)
+
 ## [v1.2.0] - 2026-11-17
 
 ### Added

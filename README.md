@@ -7,6 +7,7 @@ Production-ready Terraform module for creating and managing AWS ACM (Certificate
 - **Multiple Certificates**: Create multiple certificates via a single `certificates` map using `for_each` pattern
 - **DNS Validation**: Automatic Route53 DNS validation record creation, including certificates whose domains live in several hosted zones (`zones`)
 - **External DNS Validation**: Skip Route53 records and pass externally managed record FQDNs to the validation waiter (`validation_record_fqdns`)
+- **Route53 Records Only**: Create only the DNS validation records of an existing certificate, e.g. in the hosted zone of another account (`create_route53_records_only`)
 - **Email Validation**: Email-based validation, with an optional custom validation domain (`validation_options`)
 - **Private Certificates**: Issue private certificates from an AWS Private CA (`certificate_authority_arn` + `validation_method = "NONE"`)
 - **Exportable Certificates**: Opt-in exportable public certificates (`export`)
@@ -26,7 +27,7 @@ Production-ready Terraform module for creating and managing AWS ACM (Certificate
 
 ```hcl
 module "acm" {
-  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.2.0"
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
 
   account_name = "prod"
   project_name = "webapp"
@@ -51,7 +52,7 @@ module "acm" {
 
 ```hcl
 module "acm" {
-  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.2.0"
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
 
   account_name = "prod"
   project_name = "platform"
@@ -93,7 +94,7 @@ module "acm" {
 
 ```hcl
 module "acm" {
-  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.2.0"
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
 
   account_name = "prod"
   project_name = "web"
@@ -116,7 +117,7 @@ module "acm" {
 
 ```hcl
 module "acm" {
-  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.2.0"
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
 
   account_name = "prod"
   project_name = "webapp"
@@ -133,11 +134,59 @@ module "acm" {
 
 Use the `certificate_domain_validation_options` or `validation_domains` outputs to create the records in the external DNS provider.
 
+### Route53 Records Only (Hosted Zone in Another Account)
+
+Equivalent to the official module's `create_certificate = false` + `create_route53_records_only = true`. A certificate with `create_route53_records_only = true` is **not created**: the module only creates its Route53 validation records from `domain_validation_options` (keys come from `domain_name` and `subject_alternative_names`, so they are known at plan time). Pass the record FQDNs back through the module-level `external_validation_record_fqdns` variable, which avoids a dependency cycle between both instances.
+
+```hcl
+module "acm" {
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
+
+  account_name = "prod"
+  project_name = "webapp"
+
+  certificates = {
+    main = {
+      domain_name               = "example.com"
+      subject_alternative_names = ["*.example.com"]
+      create_route53_records    = false
+    }
+  }
+
+  external_validation_record_fqdns = {
+    main = values(module.route53_records.validation_route53_record_fqdns)
+  }
+}
+
+module "route53_records" {
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
+
+  providers = {
+    aws = aws.dns # provider for the account that owns the hosted zone
+  }
+
+  account_name = "prod"
+  project_name = "webapp"
+
+  certificates = {
+    main = {
+      domain_name                 = "example.com"
+      subject_alternative_names   = ["*.example.com"]
+      create_route53_records_only = true
+      domain_validation_options   = module.acm.certificate_domain_validation_options["main"]
+      zone_id                     = data.aws_route53_zone.this.zone_id
+    }
+  }
+}
+```
+
+See [examples/route53-records-only](./examples/route53-records-only).
+
 ### Private Certificate (AWS Private CA)
 
 ```hcl
 module "acm" {
-  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.2.0"
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
 
   account_name = "prod"
   project_name = "internal"
@@ -156,7 +205,7 @@ module "acm" {
 
 ```hcl
 module "acm" {
-  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.2.0"
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
 
   account_name = "prod"
   project_name = "legacy"
@@ -177,7 +226,7 @@ module "acm" {
 
 ```hcl
 module "acm" {
-  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.2.0"
+  source = "github.com/jhonmezaa/terraform-aws-acm//acm?ref=v1.3.0"
 
   account_name      = "prod"
   project_name      = "webapp"
@@ -206,6 +255,7 @@ module "acm" {
 | `use_region_prefix` | Whether to include region prefix in resource names                         | `bool`        | `true`  | no       |
 | `tags_common`       | Common tags applied to all certificates                                    | `map(string)` | `{}`    | no       |
 | `tags`              | **Deprecated**, use `tags_common`. Merged after `tags_common`              | `map(string)` | `{}`    | no       |
+| `external_validation_record_fqdns` | Map of certificate key => FQDNs of externally managed validation records for the waiter (e.g. from a records-only instance) | `map(list(string))` | `{}` | no |
 
 ### Certificates
 
@@ -229,6 +279,8 @@ module "acm" {
 | `zones`                      | Map of domain (without `*.`) => Route53 zone ID, for domains outside `zone_id`                      | `map(string)`  | `{}`         |
 | `create_route53_records`     | Whether to create Route53 DNS validation records                                                    | `bool`         | `true`       |
 | `validation_record_fqdns`    | FQDNs of externally managed DNS validation records passed to the waiter                             | `list(string)` | `[]`         |
+| `create_route53_records_only` | Do not create the certificate; only create its Route53 validation records from `domain_validation_options` (requires `DNS`) | `bool` | `false` |
+| `domain_validation_options`  | Domain validation options of the existing certificate (records-only mode)                           | `list(object({domain_name, resource_record_name, resource_record_type, resource_record_value}))` | `[]` |
 | `key_algorithm`              | Key algorithm: `RSA_2048`, `EC_prime256v1`, `EC_secp384r1`, `EC_secp521r1`                          | `string`       | `"RSA_2048"` |
 | `transparency_logging`       | Enable certificate transparency logging                                                             | `bool`         | `true`       |
 | `wait_for_validation`        | Wait for certificate validation to complete                                                         | `bool`         | `true`       |
@@ -241,7 +293,7 @@ module "acm" {
 | `certificate_chain`          | PEM-encoded certificate chain (for import)                                                          | `string`       | `null`       |
 | `tags`                       | Additional tags for this specific certificate                                                       | `map(string)`  | `{}`         |
 
-With `validation_method = "DNS"` and `create_route53_records = true`, every domain (after removing `*.`) must resolve to a zone through `zones` or `zone_id`.
+With `validation_method = "DNS"` and `create_route53_records = true` (or `create_route53_records_only = true`), every domain (after removing `*.`) must resolve to a zone through `zones` or `zone_id`.
 
 ## Outputs
 
@@ -254,7 +306,7 @@ With `validation_method = "DNS"` and `create_route53_records = true`, every doma
 | `certificate_domain_validation_options` | Map of domain validation options (for external DNS validation)              |
 | `certificate_validation_emails`         | Map of validation email addresses (EMAIL validation only)                   |
 | `validation_route53_record_fqdns`       | Map of Route53 validation record FQDNs                                      |
-| `distinct_domain_names`                 | Map of distinct domain names (wildcard removed) per created certificate     |
+| `distinct_domain_names`                 | Map of distinct domain names (wildcard removed) per created or records-only certificate |
 | `validation_domains`                    | Map of distinct domain validation options (wildcard removed) per certificate |
 
 ## Requirements
@@ -281,6 +333,7 @@ See the [examples](./examples) directory for complete usage examples:
 
 - [Basic](./examples/basic) - Single certificate with DNS validation and wildcard SAN
 - [Complete](./examples/complete) - Multiple certificates with different algorithms, validation methods, regions and hosted zones
+- [Route53 Records Only](./examples/route53-records-only) - Certificate in one account, DNS validation records in the hosted zone of another account (records-only mode)
 
 ## Certificate Naming
 

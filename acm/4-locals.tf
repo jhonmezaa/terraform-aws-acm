@@ -85,7 +85,14 @@ locals {
   # Filter certificates that should be created (not imported)
   create_certificates = var.create ? {
     for k, v in var.certificates : k => v
-    if !v.is_import
+    if !v.is_import && !v.create_route53_records_only
+  } : {}
+
+  # Certificates whose DNS validation records are created without creating the
+  # certificate (records-only mode, e.g. Route53 in another account).
+  records_only_certificates = var.create ? {
+    for k, v in var.certificates : k => v
+    if v.create_route53_records_only && !v.is_import
   } : {}
 
   # Filter certificates that should be imported
@@ -103,7 +110,7 @@ locals {
   # We deduplicate by replacing wildcard prefixes (*.) since the validation record
   # for *.example.com is the same as example.com.
   dns_validation_domains = merge([
-    for cert_key, cert in local.create_certificates : {
+    for cert_key, cert in merge(local.create_certificates, local.records_only_certificates) : {
       for domain in distinct([
         for d in concat([cert.domain_name], cert.subject_alternative_names) :
         replace(d, "*.", "")
@@ -112,12 +119,12 @@ locals {
         cert_key = cert_key
         zone_id  = lookup(cert.zones, domain, cert.zone_id)
       }
-    } if cert.validation_method == "DNS" && cert.create_route53_records
+    } if cert.validation_method == "DNS" && (cert.create_route53_records || cert.create_route53_records_only)
   ]...)
 
-  # Distinct domain names (wildcards removed) per created certificate.
+  # Distinct domain names (wildcards removed) per created or records-only certificate.
   distinct_domain_names = {
-    for cert_key, cert in local.create_certificates : cert_key => distinct([
+    for cert_key, cert in merge(local.create_certificates, local.records_only_certificates) : cert_key => distinct([
       for d in concat([cert.domain_name], cert.subject_alternative_names) :
       replace(d, "*.", "")
     ])
