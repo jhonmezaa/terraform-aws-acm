@@ -4,8 +4,10 @@
 # This example demonstrates multiple certificates with different configurations:
 # - DNS validated certificate with wildcard SAN
 # - DNS validated certificate with multiple SANs
-# - Email validated certificate
+# - Email validated certificate (with a custom validation domain)
 # - Certificate with EC key algorithm
+# - CloudFront certificate pinned to us-east-1 with an explicit Name tag
+# - Multi-zone certificate (only when secondary_domain is set)
 
 provider "aws" {
   region = var.aws_region
@@ -37,7 +39,7 @@ module "acm" {
   account_name = var.account_name
   project_name = var.project_name
 
-  certificates = {
+  certificates = merge({
     # Primary wildcard certificate with DNS validation
     wildcard = {
       domain_name = var.primary_domain
@@ -72,16 +74,45 @@ module "acm" {
       }
     }
 
-    # Email validated certificate (no Route53 records created)
+    # Email validated certificate (no Route53 records created). Validation
+    # emails for mail.<domain> are sent to admin@<domain>, etc.
     email-validated = {
-      domain_name         = var.primary_domain
-      validation_method   = "EMAIL"
+      domain_name       = "mail.${var.primary_domain}"
+      validation_method = "EMAIL"
+      validation_options = {
+        "mail.${var.primary_domain}" = var.primary_domain
+      }
       wait_for_validation = false
       tags = {
         CertificateType = "email-validation"
       }
     }
-  }
 
-  tags = var.tags
+    # CloudFront requires certificates in us-east-1, whatever the provider region
+    cloudfront = {
+      name        = "cloudfront-${var.project_name}"
+      region      = "us-east-1"
+      domain_name = "cdn.${var.primary_domain}"
+      zone_id     = data.aws_route53_zone.primary.zone_id
+      tags = {
+        CertificateType = "cloudfront"
+      }
+    }
+    },
+    # Certificate spanning two hosted zones (domains not in `zones` use zone_id)
+    var.secondary_domain != null ? {
+      multi-zone = {
+        domain_name               = var.primary_domain
+        subject_alternative_names = [var.secondary_domain, "*.${var.secondary_domain}"]
+        zone_id                   = data.aws_route53_zone.primary.zone_id
+        zones = {
+          (var.secondary_domain) = data.aws_route53_zone.secondary[0].zone_id
+        }
+        tags = {
+          CertificateType = "multi-zone"
+        }
+      }
+  } : {})
+
+  tags_common = var.tags
 }

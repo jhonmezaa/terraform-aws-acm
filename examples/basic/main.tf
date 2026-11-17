@@ -37,5 +37,5 @@ module "acm" {
     }
   }
 
-  tags = var.tags
+  tags_common = var.tags
 }
