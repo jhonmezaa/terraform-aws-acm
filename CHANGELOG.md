@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.0] - 2026-11-17
+
+### Added
+
+- `tags_common` variable (project tagging convention); `tags` is kept as a deprecated alias merged after it
+- Per-certificate `name` attribute to set an explicit `Name` tag
+- Per-certificate `region` attribute (AWS provider v6 `region` argument) applied to the certificate, imported certificate and validation waiter, e.g. `us-east-1` for CloudFront. The `Name` tag uses that region's prefix
+- Private certificates issued by AWS Private CA: `certificate_authority_arn` with `validation_method = "NONE"`
+- `export` option (`ENABLED`/`DISABLED`) for exportable certificates
+- `validation_options` map (domain => validation domain) for EMAIL validation
+- `zones` map (domain => Route53 zone ID) for certificates whose domains live in several hosted zones
+- `validation_record_fqdns` to pass externally managed DNS validation records to the validation waiter
+- Outputs `certificate_names`, `distinct_domain_names` and `validation_domains`
+- Region prefixes for `ap-southeast-5`, `ap-southeast-6`, `ap-southeast-7`, `ap-east-2` and `mx-central-1`
+- README for each example
+
+### Changed
+
+- Variable validation error messages translated to Spanish (project convention)
+- `Name` and `ManagedBy` tags are now applied last, so they can no longer be overridden through `tags`/`tags_common`/certificate `tags` (use the certificate `name` attribute instead)
+- Example version files renamed from `0-versions.tf` to `versions.tf`; examples now require AWS provider `~> 6.4`
+- README rewritten: `source` uses `github.com/jhonmezaa/terraform-aws-acm//acm?ref=<tag>`, inputs/outputs match the code, and the import example now sets `is_import = true`
+
+### Fixed
+
+- New validations: imported certificates require `certificate_body` and `private_key`; DNS validation with Route53 records requires a zone (`zone_id` or `zones`) for every domain, instead of failing later with a missing `zone_id` on `aws_route53_record`
+
+### Deprecated
+
+- `tags` variable: use `tags_common`
+
+### Upgrade notes
+
+- The minimum AWS provider version is now `>= 6.4` (first release supporting `options.export` on `aws_acm_certificate`)
+- If you set a `Name` tag through `tags` or a certificate's `tags`, it is now replaced by the generated name (in-place tag update, no recreation). Set the certificate `name` attribute to keep a custom value
+- No resource is recreated: certificate keys, Route53 record keys and the generated names are unchanged
+
 ## [v1.1.5] - 2026-10-27
 
 ### Changed
